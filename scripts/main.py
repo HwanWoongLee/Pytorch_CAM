@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from scripts.model import QVGGNetCAM
+import cv2 as cv
 
 
 # parameter
@@ -112,7 +113,7 @@ print('param.requires_grad: ', param.requires_grad)
 
 test_dataloader = DataLoader(dataset=test_datasets, batch_size=1, shuffle=False)
 
-# cal accuracy
+# cal accuracy & CAM
 total_num = 0
 correct_num = 0
 
@@ -131,9 +132,26 @@ for data, label in test_dataloader:
         m = f * w
         s += m.to('cpu')
 
+    image_np = data.to('cpu')
+    image_np = torch.squeeze(image_np[0]).numpy()
+    image_np = np.transpose(image_np, (1, 2, 0))
+    image_np = cv.normalize(image_np, dst=None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8UC1)
+    image_np = cv.cvtColor(image_np, cv.COLOR_BGR2GRAY)
+    image_pil = transforms.ToPILImage()(image_np)
+
     s_np = s.detach().numpy()
+    s_np = cv.resize(s_np, dsize=(224, 224), interpolation=cv.INTER_CUBIC)
+    s_np = cv.normalize(s_np, dst=None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8UC1)
     s_image = transforms.ToPILImage()(s_np)
-    plt.imshow(s_image, cmap='jet')
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 2, 1)
+    ax1.imshow(image_pil, cmap='gray')
+
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.imshow(image_pil, cmap='gray', alpha=1.0)
+    ax2.imshow(s_image, cmap='jet', alpha=0.5)
+
     plt.show()
 
     _, predict = torch.max(output.data, 1)
